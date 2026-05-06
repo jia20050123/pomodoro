@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍅 番茄钟</title>
+<style>
+  :root {
+    --work: #e74c3c;
+    --short-break: #2ecc71;
+    --long-break: #3498db;
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --text: #eee;
+    --muted: #999;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .container {
+    text-align: center;
+    padding: 40px 32px;
+  }
+
+  .mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 40px;
+  }
+
+  .mode-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .mode-tab:hover { color: var(--text); }
+  .mode-tab.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .timer-ring-wrapper {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    margin: 0 auto 36px;
+  }
+
+  .timer-ring {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: var(--surface);
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--work);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s linear, stroke 0.3s;
+  }
+
+  .time-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .time-text {
+    font-size: 72px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -2px;
+  }
+
+  .time-label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+
+  .btn {
+    border: none;
+    padding: 14px 32px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:active { transform: scale(0.96); }
+
+  .btn-start {
+    background: var(--work);
+    color: #fff;
+    min-width: 130px;
+  }
+  .btn-start:hover { filter: brightness(1.1); }
+
+  .btn-reset {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .btn-reset:hover { background: #1e2a4a; }
+
+  .stats {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .footer {
+    margin-top: 36px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Session dots */
+  .sessions {
+    margin-top: 20px;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .session-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--surface);
+    transition: background 0.3s;
+  }
+
+  .session-dot.done { background: var(--work); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .timer-ring-wrapper.running .time-text {
+    animation: pulse 2s ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 模式切换 -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="work">🍅 专注</button>
+    <button class="mode-tab" data-mode="short-break">☕ 短休息</button>
+    <button class="mode-tab" data-mode="long-break">🌴 长休息</button>
+  </div>
+
+  <!-- 计时环 -->
+  <div class="timer-ring-wrapper">
+    <svg class="timer-ring" viewBox="0 0 200 200">
+      <circle class="ring-bg" cx="100" cy="100" r="92"/>
+      <circle class="ring-progress" cx="100" cy="100" r="92"
+              stroke-dasharray="578" stroke-dashoffset="0"/>
+    </svg>
+    <div class="time-display">
+      <span class="time-text">25:00</span>
+      <span class="time-label">准备好开始专注</span>
+    </div>
+  </div>
+
+  <!-- 控制按钮 -->
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart">开始</button>
+    <button class="btn btn-reset" id="btnReset">重置</button>
+  </div>
+
+  <!-- 统计数据 -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="pomodoroCount">0</div>
+      <div class="stat-label">今日番茄</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="totalMinutes">0</div>
+      <div class="stat-label">专注分钟</div>
+    </div>
+  </div>
+
+  <!-- 进度点点 -->
+  <div class="sessions" id="sessionDots"></div>
+
+  <div class="footer">点击"开始"启动计时 · 完成后自动提示</div>
+</div>
+
+<script>
+  const CIRCUMFERENCE = 2 * Math.PI * 92; // ~578
+
+  const MODES = {
+    work:        { label: '专注时间', color: '#e74c3c', minutes: 25 },
+    'short-break': { label: '短休息',   color: '#2ecc71', minutes: 5  },
+    'long-break':  { label: '长休息',   color: '#3498db', minutes: 15 },
+  };
+
+  let currentMode = 'work';
+  let totalSeconds = MODES.work.minutes * 60;
+  let remainingSeconds = totalSeconds;
+  let timerId = null;
+  let pomodoroCount = 0;
+  let totalFocusMinutes = 0;
+
+  // DOM refs
+  const ringProgress = document.querySelector('.ring-progress');
+  const timeText = document.querySelector('.time-text');
+  const timeLabel = document.querySelector('.time-label');
+  const btnStart = document.getElementById('btnStart');
+  const btnReset = document.getElementById('btnReset');
+  const wrapper = document.querySelector('.timer-ring-wrapper');
+  const sessionDots = document.getElementById('sessionDots');
+  const pomodoroCountEl = document.getElementById('pomodoroCount');
+  const totalMinutesEl = document.getElementById('totalMinutes');
+  const modeTabs = document.querySelectorAll('.mode-tab');
+
+  // Audio — create a simple beep using Web Audio API
+  function playNotification() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [800, 1000, 1200].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.value = 0.15;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime + i * 0.3);
+      osc.stop(ctx.currentTime + i * 0.3 + 0.35);
+    });
+  }
+
+  function showBrowserNotification(title, body) {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '🍅' });
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') new Notification(title, { body, icon: '🍅' });
+      });
+    }
+  }
+
+  function formatTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function updateRing() {
+    const fraction = remainingSeconds / totalSeconds;
+    const offset = CIRCUMFERENCE * (1 - fraction);
+    ringProgress.style.strokeDashoffset = offset;
+  }
+
+  function updateDisplay() {
+    timeText.textContent = formatTime(remainingSeconds);
+    updateRing();
+  }
+
+  function setProgressColor(color) {
+    ringProgress.style.stroke = color;
+  }
+
+  function switchMode(mode) {
+    currentMode = mode;
+    totalSeconds = MODES[mode].minutes * 60;
+    remainingSeconds = totalSeconds;
+    setProgressColor(MODES[mode].color);
+    timeLabel.textContent = MODES[mode].label;
+    updateDisplay();
+
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+  }
+
+  function tick() {
+    if (remainingSeconds <= 0) {
+      stopTimer();
+      onSessionComplete();
+      return;
+    }
+    remainingSeconds--;
+    updateDisplay();
+  }
+
+  function startTimer() {
+    if (timerId) return;
+    timerId = setInterval(tick, 1000);
+    btnStart.textContent = '暂停';
+    wrapper.classList.add('running');
+    timeLabel.textContent = MODES[currentMode].label;
+  }
+
+  function stopTimer() {
+    if (!timerId) return;
+    clearInterval(timerId);
+    timerId = null;
+    btnStart.textContent = '继续';
+    wrapper.classList.remove('running');
+  }
+
+  function resetTimer() {
+    stopTimer();
+    remainingSeconds = totalSeconds;
+    updateDisplay();
+    btnStart.textContent = '开始';
+    wrapper.classList.remove('running');
+    timeLabel.textContent = '准备好开始专注';
+  }
+
+  function onSessionComplete() {
+    playNotification();
+
+    if (currentMode === 'work') {
+      pomodoroCount++;
+      totalFocusMinutes += MODES.work.minutes;
+      pomodoroCountEl.textContent = pomodoroCount;
+      totalMinutesEl.textContent = totalFocusMinutes;
+      updateSessionDots();
+      showBrowserNotification('番茄完成! 🍅', `已完成 ${pomodoroCount} 个番茄，休息一下吧~`);
+      switchMode('short-break');
+      timeLabel.textContent = '休息一下!';
+    } else {
+      showBrowserNotification('休息结束!', '该开始下一个番茄了~');
+      switchMode('work');
+      timeLabel.textContent = '开始下一个番茄!';
+    }
+
+    updateDisplay();
+  }
+
+  function updateSessionDots() {
+    const dotsPerRow = 8;
+    const totalDots = Math.max(pomodoroCount, 0);
+    sessionDots.innerHTML = '';
+    for (let i = 0; i < totalDots; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'session-dot done';
+      sessionDots.appendChild(dot);
+    }
+  }
+
+  // Event listeners
+  btnStart.addEventListener('click', () => {
+    if (timerId) stopTimer();
+    else startTimer();
+  });
+
+  btnReset.addEventListener('click', resetTimer);
+
+  modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      stopTimer();
+      switchMode(tab.dataset.mode);
+      btnStart.textContent = '开始';
+      wrapper.classList.remove('running');
+    });
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      btnStart.click();
+    } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
+      btnReset.click();
+    }
+  });
+
+  // Initialize
+  ringProgress.style.strokeDasharray = CIRCUMFERENCE;
+  ringProgress.style.strokeDashoffset = '0';
+  setProgressColor(MODES.work.color);
+  updateDisplay();
+</script>
+
+</body>
+</html>
